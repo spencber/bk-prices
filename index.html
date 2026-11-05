@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSNN Live | KrankyCart BK Price Radar</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;700;800&display=swap');
+    body {
+      background-color: #000000;
+      color: #FFFFFF;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="bg-black text-white min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const CORRIDORS = [
+      { id: 'east_flatbush', name: 'East Flatbush', cross: 'Church & Utica Ave', count: '5 Chains / 11 Bodegas' },
+      { id: 'canarsie', name: 'Canarsie', cross: 'Flatlands & Rockaway Pkwy', count: '4 Chains / 9 Bodegas' },
+      { id: 'east_ny', name: 'East New York', cross: 'Pennsylvania & Atlantic', count: '6 Chains / 14 Bodegas' },
+      { id: 'brownsville', name: 'Brownsville', cross: 'Pitkin & Rockaway Ave', count: '4 Chains / 12 Bodegas' },
+      { id: 'flatbush', name: 'Flatbush / Ditmas', cross: 'Flatbush Ave & Cortelyou', count: '7 Chains / 18 Bodegas' },
+      { id: 'bed_stuy', name: 'Bed-Stuy', cross: 'Fulton & Nostrand Ave', count: '6 Chains / 15 Bodegas' },
+      { id: 'crown_heights', name: 'Crown Heights', cross: 'Franklin & Nostrand Ave', count: '5 Chains / 13 Bodegas' },
+      { id: 'bushwick', name: 'Bushwick', cross: 'Knickerbocker & Wyckoff', count: '7 Chains / 21 Bodegas' },
+      { id: 'sunset_park', name: 'Sunset Park', cross: '5th & 8th Ave Corridors', count: '8 Chains / 16 Bodegas' },
+      { id: 'downtown_bk', name: 'Downtown BK / Fort Greene', cross: 'City Point / Atlantic Term.', count: '8 Chains / 10 Bodegas' }
+    ];
+
+    const STAPLES = [
+      { id: 1, name: 'Vital Farms Pasture Eggs (12ct)', cat: 'Dairy & Eggs', basePrice: 4.89, peakPrice: 9.49, unit: '12 large eggs', peakStore: 'Church Ave Corner Deli', bestStore: 'Gateway Target' },
+      { id: 2, name: 'Oatly Barista Edition (32oz)', cat: 'Dairy & Plant', basePrice: 3.99, peakPrice: 7.29, unit: '32 fl oz carton', peakStore: 'Rockaway Deli & Grill', bestStore: 'Western Beef' },
+      { id: 3, name: "Rao's Homemade Marinara (24oz)", cat: 'Pantry', basePrice: 6.99, peakPrice: 12.49, unit: '24 oz jar', peakStore: 'Pennsylvania Express Deli', bestStore: 'Gateway Target' },
+      { id: 4, name: 'Kerrygold Pure Irish Butter (8oz)', cat: 'Dairy & Eggs', basePrice: 4.19, peakPrice: 7.99, unit: '8 oz salted slab', peakStore: 'Flatbush Ave Mini Market', bestStore: 'Gateway ShopRite' },
+      { id: 5, name: "Dave's Killer Bread 21 Whole Grains", cat: 'Bakery', basePrice: 5.49, peakPrice: 8.99, unit: '27 oz loaf', peakStore: 'Pitkin Food Mart', bestStore: 'Gateway Target' },
+      { id: 6, name: 'Hass Avocados (Bag of 4)', cat: 'Produce', basePrice: 2.99, peakPrice: 5.99, unit: '4-pack net bag', peakStore: 'Utica Grocery Corner', bestStore: 'Western Beef' },
+      { id: 7, name: 'Tropicana Pure Premium Orange Juice (52oz)', cat: 'Beverages', basePrice: 3.79, peakPrice: 6.89, unit: '52 fl oz jug', peakStore: 'Church Ave Bodega', bestStore: 'C-Town Supermarket' },
+      { id: 8, name: "Hellmann's Real Mayonnaise (30oz)", cat: 'Pantry', basePrice: 4.99, peakPrice: 8.49, unit: '30 oz jar', peakStore: 'Rockaway Pkwy Deli', bestStore: 'Gateway ShopRite' }
+    ];
+
+    function App() {
+      const [corridor, setCorridor] = useState('east_flatbush');
+      const [category, setCategory] = useState('All');
+      const [search, setSearch] = useState('');
+      const [cart, setCart] = useState([1, 2, 3, 4]);
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [reportSubmitted, setReportSubmitted] = useState(false);
+
+      const activeCorridorObj = CORRIDORS.find(c => c.id === corridor) || CORRIDORS[0];
+
+      const filteredItems = useMemo(() => {
+        return STAPLES.filter(item => {
+          const matchCat = category === 'All' || item.cat === category;
+          const matchQuery = item.name.toLowerCase().includes(search.toLowerCase());
+          return matchCat && matchQuery;
+        });
+      }, [category, search]);
+
+      const cartTotalBest = cart.reduce((acc, id) => {
+        const item = STAPLES.find(s => s.id === id);
+        return acc + (item ? item.basePrice : 0);
+      }, 0);
+
+      const cartTotalPeak = cart.reduce((acc, id) => {
+        const item = STAPLES.find(s => s.id === id);
+        return acc + (item ? item.peakPrice : 0);
+      }, 0);
+
+      const savings = cartTotalPeak - cartTotalBest;
+      const annualSavings = (savings * 52).toFixed(0);
+
+      const toggleCart = (id) => {
+        if (cart.includes(id)) {
+          setCart(cart.filter(item => item !== id));
+        } else {
+          setCart([...cart, id]);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-amber-400 selection:text-black">
+          {/* SSNN LIVE TOP BROADCAST TICKER */}
+          <header className="border-b-2 border-amber-500/40 bg-zinc-950 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs tracking-wider uppercase font-mono-num gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <span className="font-bold text-amber-400">SSNN LIVE DISPATCH:</span>
+              <span className="text-zinc-300 hidden md:inline">BROOKLYN SHELF-PRICE RADAR • REAL-TIME LOCAL DISCREPANCIES</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <a 
+                href="https://ssnnlive.com" 
+                target="_blank" 
+                rel="noreferrer"
+                className="bg-amber-400 hover:bg-amber-300 text-black font-extrabold px-3 py-1 rounded transition text-xs flex items-center gap-1.5 shadow-sm"
+              >
+                <span>&larr; BACK TO SSNNLIVE.COM</span>
+              </a>
+            </div>
+          </header>
+
+          {/* HERO BANNER */}
+          <div className="border-b border-zinc-800 bg-gradient-to-b from-zinc-950 to-black px-4 sm:px-8 py-8 sm:py-12">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <div className="inline-block px-2.5 py-1 mb-3 bg-amber-500/10 border border-amber-500/40 rounded text-amber-400 text-xs font-mono-num font-bold">
+                  KRANKYCART BK &bull; STREET INVESTIGATIVE DESK
+                </div>
+                <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white uppercase">
+                  Brooklyn <span className="text-amber-400 underline decoration-amber-500/50">Price Radar</span>
+                </h1>
+                <p className="mt-2 text-zinc-300 text-sm sm:text-base max-w-2xl font-light">
+                  Compare exact supermarket shelf tags against local bodega markups across Church Ave, Pennsylvania Ave, Flatlands, and Fulton corridors.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4 bg-zinc-900 border-2 border-amber-500/60 p-4 rounded-lg shadow-xl font-mono-num">
+                <div className="text-right">
+                  <div className="text-xs uppercase text-zinc-400 font-bold">Average BK Gouge Spread</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-amber-400">+58.4%</div>
+                </div>
+                <div className="h-10 w-px bg-zinc-800"></div>
+                <div>
+                  <div className="text-xs uppercase text-zinc-400 font-bold">Active Corridors</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-white">10 ZONES</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* MAIN BODY WORKSPACE */}
+          <main className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-8 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              
+              {/* CORRIDOR SELECTOR */}
+              <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-mono-num uppercase font-bold text-amber-400 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                    SELECT BROOKLYN TARGET CORRIDOR
+                  </label>
+                  <span className="text-xs font-mono-num text-zinc-400">{activeCorridorObj.count}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                  {CORRIDORS.map(cor => (
+                    <button
+                      key={cor.id}
+                      onClick={() => setCorridor(cor.id)}
+                      className={`text-left p-2.5 rounded-lg border text-xs transition font-mono-num ${
+                        corridor === cor.id
+                          ? 'border-amber-400 bg-amber-400/10 text-amber-300 font-bold'
+                          : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="truncate font-bold">{cor.name}</div>
+                      <div className="text-[10px] text-zinc-400 truncate">{cor.cross}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SEARCH & CATEGORY BAR */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  placeholder="Search staples (eggs, Oatly, marinara, butter)..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 font-mono-num placeholder:text-zinc-600"
+                />
+                <div className="flex overflow-x-auto gap-2 pb-1 sm:pb-0 text-xs font-mono-num">
+                  {['All', 'Dairy & Eggs', 'Pantry', 'Bakery', 'Beverages', 'Produce'].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCategory(cat)}
+                      className={`px-3 py-2 rounded-lg border whitespace-nowrap transition ${
+                        category === cat
+                          ? 'bg-amber-400 text-black font-bold border-amber-400'
+                          : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* STAPLE CARDS */}
+              <div className="flex flex-col gap-3">
+                {filteredItems.map(item => {
+                  const inCart = cart.includes(item.id);
+                  const spread = (((item.peakPrice - item.basePrice) / item.basePrice) * 100).toFixed(0);
+                  const deltaDollar = (item.peakPrice - item.basePrice).toFixed(2);
+
+                  return (
+                    <div 
+                      key={item.id}
+                      className="bg-zinc-950 border-2 border-zinc-900 hover:border-zinc-700 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition shadow-md"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-amber-400">
+                            {item.cat}
+                          </span>
+                          <span className="text-[11px] font-mono-num text-zinc-500">
+                            {item.unit}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-bold text-white tracking-wide">
+                          {item.name}
+                        </h3>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-mono-num">
+                          <div className="bg-zinc-900/80 p-2 rounded border border-zinc-800">
+                            <div className="text-[10px] text-zinc-400 uppercase font-bold">Cheapest In Corridor</div>
+                            <div className="text-sm font-extrabold text-emerald-400">${item.basePrice.toFixed(2)}</div>
+                            <div className="text-[10px] text-zinc-300 truncate">{item.bestStore}</div>
+                          </div>
+                          <div className="bg-zinc-900/80 p-2 rounded border border-zinc-800">
+                            <div className="text-[10px] text-red-400 uppercase font-bold">Highest Markup</div>
+                            <div className="text-sm font-extrabold text-red-400">${item.peakPrice.toFixed(2)}</div>
+                            <div className="text-[10px] text-zinc-300 truncate">{item.peakStore}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-900">
+                        <div className="text-left sm:text-right font-mono-num">
+                          <div className="text-xs text-red-400 font-bold">+{spread}% RIP-OFF SPREAD</div>
+                          <div className="text-xs text-zinc-400">+${deltaDollar} extra at deli</div>
+                        </div>
+                        <button
+                          onClick={() => toggleCart(item.id)}
+                          className={`px-3 py-2 rounded font-mono-num text-xs font-extrabold transition ${
+                            inCart
+                              ? 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700 hover:text-white'
+                              : 'bg-amber-400 text-black hover:bg-amber-300 shadow-md'
+                          }`}
+                        >
+                          {inCart ? '✓ IN HAUL SIMULATOR' : '+ ADD TO HAUL'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="lg:col-span-4 flex flex-col gap-6">
+
+              <div className="bg-zinc-950 border-2 border-amber-500/70 p-5 rounded-xl shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-amber-400 text-black text-[10px] font-mono-num font-black px-3 py-0.5 rounded-bl uppercase">
+                  Walk Optimizer
+                </div>
+                
+                <h2 className="text-lg font-bold text-white uppercase tracking-tight flex items-center gap-2">
+                  <span>The 2-Stop Walk</span>
+                </h2>
+                <p className="text-xs text-zinc-400 mt-1 font-mono-num">
+                  Active corridor: <span className="text-amber-400 font-bold">{activeCorridorObj.name}</span>
+                </p>
+
+                <div className="my-4 p-4 rounded-lg bg-black border border-zinc-800 font-mono-num flex flex-col gap-3">
+                  <div className="flex justify-between items-center text-xs pb-2 border-b border-zinc-800">
+                    <span className="text-zinc-400">Convenience Bodega Only:</span>
+                    <span className="text-red-400 font-bold line-through">${cartTotalPeak.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pb-2 border-b border-zinc-800">
+                    <span className="text-emerald-400 font-bold">Optimized 2-Stop Split:</span>
+                    <span className="text-emerald-400 font-extrabold text-base">${cartTotalBest.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm pt-1 bg-amber-400/10 p-2 rounded border border-amber-500/30">
+                    <span className="text-amber-300 font-bold">Saved This Run:</span>
+                    <span className="text-amber-400 font-black text-lg">+${savings.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 text-center font-mono-num">
+                  <div className="text-[10px] uppercase text-zinc-400 font-bold">Estimated 52-Week Haul Drain</div>
+                  <div className="text-3xl font-black text-amber-400 mt-1">${annualSavings}</div>
+                  <div className="text-[11px] text-zinc-400 mt-1">Kept in your pocket vs single-store convenience runs</div>
+                </div>
+
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="w-full mt-4 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 py-3 rounded-lg text-xs font-mono-num font-bold uppercase transition flex items-center justify-center gap-2"
+                >
+                  <span>📷 Report Gouge Shelf Tag</span>
+                </button>
+              </div>
+
+              <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-xl font-mono-num text-xs">
+                <div className="text-amber-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span>SSNN Live Tipline</span>
+                </div>
+                <p className="text-zinc-300 text-[11px] leading-relaxed">
+                  Notice an outrageous price jump in Flatbush, East New York, or Crown Heights? Send receipts and photos to our consumer investigative team.
+                </p>
+                <div className="mt-3 pt-3 border-t border-zinc-800 text-zinc-400 text-[11px]">
+                  Direct inquiries: <span className="text-white">scouts@ssnnlive.com</span>
+                </div>
+              </div>
+
+            </div>
+
+          </main>
+
+          {/* REPORT GOUGE MODAL */}
+          {isModalOpen && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-zinc-950 border-2 border-amber-500 rounded-xl p-6 max-w-md w-full font-mono-num">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-base font-bold text-white uppercase">Report Shelf Gouge</h3>
+                  <button onClick={() => { setIsModalOpen(false); setReportSubmitted(false); }} className="text-zinc-400 hover:text-white">✕</button>
+                </div>
+                
+                {reportSubmitted ? (
+                  <div className="text-center py-6">
+                    <div className="text-emerald-400 text-2xl font-bold mb-2">TAG LOGGED!</div>
+                    <p className="text-xs text-zinc-300">Your price report has been submitted to the SSNN Live Brooklyn investigative queue.</p>
+                    <button 
+                      onClick={() => { setIsModalOpen(false); setReportSubmitted(false); }} 
+                      className="mt-5 bg-amber-400 text-black px-4 py-2 rounded text-xs font-bold"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={(e) => { e.preventDefault(); setReportSubmitted(true); }} className="flex flex-col gap-3 text-xs">
+                    <div>
+                      <label className="text-zinc-400 uppercase text-[10px] font-bold">Store / Bodega Name</label>
+                      <input required type="text" placeholder="e.g., Church Ave Deli & Grocery" className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-white mt-1 focus:border-amber-400 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-zinc-400 uppercase text-[10px] font-bold">Product Name</label>
+                      <input required type="text" placeholder="e.g., Vital Farms Eggs (12ct)" className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-white mt-1 focus:border-amber-400 focus:outline-none" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-zinc-400 uppercase text-[10px] font-bold">Price Seen ($)</label>
+                        <input required type="number" step="0.01" placeholder="8.99" className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-white mt-1 focus:border-amber-400 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-zinc-400 uppercase text-[10px] font-bold">Corridor</label>
+                        <select className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-white mt-1 focus:border-amber-400 focus:outline-none">
+                          <option>East Flatbush</option>
+                          <option>Canarsie</option>
+                          <option>East New York</option>
+                          <option>Brownsville</option>
+                          <option>Flatbush</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button type="submit" className="mt-3 bg-amber-400 hover:bg-amber-300 text-black font-extrabold py-2.5 rounded uppercase">
+                      Dispatch To SSNN Field Desk
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* GLOBAL FOOTER */}
+          <footer className="border-t border-zinc-800 bg-zinc-950 py-6 px-4 sm:px-8 text-center text-xs font-mono-num text-zinc-500">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-zinc-400">
+                &copy; {new Date().getFullYear()} <a href="https://ssnnlive.com" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline font-bold">SSNN Live</a>. All rights reserved.
+              </div>
+              <div className="flex gap-4">
+                <a href="https://ssnnlive.com" target="_blank" rel="noreferrer" className="hover:text-amber-400">Network Homepage</a>
+                <span className="text-zinc-700">&bull;</span>
+                <span className="text-zinc-400">Consumer Radar Edition</span>
+              </div>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
